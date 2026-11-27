@@ -202,3 +202,49 @@ test('scan con Gemini simulado: precarga sin guardar y guarda solo al confirmar'
     config.geminiApiKey = '';
   }
 });
+
+test('ajustes desde la app: key cifrada, enmascarada, por usuario y usada por el OCR', async () => {
+  const vacio = await api('andre', 'GET', '/ajustes');
+  assert.equal(vacio.data.gemini.configurada, false);
+  assert.equal(vacio.data.moneda, 'PEN');
+
+  const put = await api('andre', 'PUT', '/ajustes', { gemini_api_key: 'AIzaSECRETA1234', gemini_model: 'gemini-flash-latest', n8n_webhook_url: 'https://n8n.example.com/webhook/x', moneda: 'USD' });
+  assert.equal(put.status, 200);
+  assert.equal(put.data.gemini.key_mascara, '••••••••1234');
+  assert.equal(put.data.gemini.origen, 'app');
+  assert.ok(!JSON.stringify(put.data).includes('SECRETA'));
+  const { rows } = await pool.query('SELECT gemini_api_key_cifrada FROM ajustes');
+  assert.ok(!rows[0].gemini_api_key_cifrada.includes('SECRETA'), 'debe estar cifrada en la BD');
+  assert.equal((await api('otro', 'GET', '/ajustes')).data.gemini.configurada, false);
+  assert.equal((await api('andre', 'PUT', '/ajustes', { n8n_webhook_url: 'ftp://x' })).status, 400);
+
+  const fetchReal = globalThis.fetch;
+  let keyUsada;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes('generativelanguage.googleapis.com')) {
+      keyUsada = opts.headers['x-goog-api-key'];
+      if (String(url).includes('/models?')) {
+        return Response.json({ models: [{ name: 'models/gemini-flash-latest', displayName: 'Gemini Flash', supportedGenerationMethods: ['generateContent'] }, { name: 'models/text-embedding-004', supportedGenerationMethods: ['embedContent'] }] });
+      }
+      return Response.json({ candidates: [{ content: { parts: [{ text: '{"monto": 10}' }] } }] });
+    }
+    return fetchReal(url, opts);
+  };
+  try {
+    const p = await api('andre', 'POST', '/ajustes/probar-gemini', {});
+    assert.deepEqual(p.data.modelos.map((m) => m.id), ['gemini-flash-latest']);
+    assert.equal(keyUsada, 'AIzaSECRETA1234');
+    const fd = new FormData();
+    fd.append('imagen', new Blob([Buffer.from([0xff, 0xd8])], { type: 'image/jpeg' }), 't.jpg');
+    assert.equal((await api('andre', 'POST', '/ocr/scan', fd)).status, 200);
+    // el otro usuario no tiene key => 503
+    const fd2 = new FormData();
+    fd2.append('imagen', new Blob([Buffer.from([0xff, 0xd8])], { type: 'image/jpeg' }), 't.jpg');
+    assert.equal((await api('otro', 'POST', '/ocr/scan', fd2)).status, 503);
+  } finally {
+    globalThis.fetch = fetchReal;
+  }
+  const borrar = await api('andre', 'PUT', '/ajustes', { gemini_api_key: '', n8n_webhook_url: '' });
+  assert.equal(borrar.data.gemini.configurada, false);
+  assert.equal(borrar.data.moneda, 'USD');
+});

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAjustes } from '../hooks/useAjustes';
 import { useScanTicket } from '../hooks/useOcr';
 import { useGuardarMovimiento } from '../hooks/useMovimientos';
 import { Card, Cabecera, ErrorMsg } from '../components/ui';
@@ -18,6 +19,7 @@ export default function Scan() {
   const guardar = useGuardarMovimiento();
   const toast = useUi((s) => s.toast);
   const nav = useNavigate();
+  const { data: ajustes } = useAjustes();
 
   useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
 
@@ -46,6 +48,11 @@ export default function Scan() {
     <>
       <Cabecera titulo="Escanear ticket" subtitulo="Toma una foto y revisa los datos antes de guardar" />
       <div className="grid grid-igual" style={{ alignItems: 'start' }}>
+        {ajustes && !ajustes.gemini.configurada && (
+          <div className="alerta alerta-pendiente" style={{ gridColumn: '1 / -1' }}>
+            Para leer tickets necesitas una API key de Gemini (gratis). <Link to="/configuracion">Configúrala aquí →</Link>
+          </div>
+        )}
         <Card titulo="1. Foto del ticket">
           {!archivo ? (
             <div className={`zona-scan ${arrastrando ? 'arrastrando' : ''}`} onClick={() => inputRef.current?.click()}

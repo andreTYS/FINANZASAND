@@ -1,5 +1,5 @@
-import { config } from '../../config.js';
 import { query } from '../../db/pool.js';
+import { obtenerAjustes } from '../ajustes/ajustes.routes.js';
 
 /**
  * Dispara un evento hacia n8n DESPUÉS de que la transacción se confirmó.
@@ -9,9 +9,10 @@ export function dispararEvento(evento, movimiento, extra = {}) {
   const payload = { evento, movimiento, ...extra, enviado_en: new Date().toISOString() };
   (async () => {
     let estado = 'omitido_sin_webhook';
-    if (config.n8nWebhookUrl) {
+    const { n8nWebhookUrl } = await obtenerAjustes(movimiento.usuario_id).catch(() => ({}));
+    if (n8nWebhookUrl) {
       try {
-        const r = await fetch(config.n8nWebhookUrl, {
+        const r = await fetch(n8nWebhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),

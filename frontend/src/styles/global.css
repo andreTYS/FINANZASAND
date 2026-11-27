@@ -235,3 +235,4 @@ table.tabla { width: 100%; border-collapse: collapse; font-size: var(--texto-sm)
 .input, .select { min-width: 0; }
 .registro-grid { grid-template-columns: minmax(0, 1.5fr) minmax(340px, 1fr); }
 @media (max-width: 900px) { .registro-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .preview-ticket { max-height: 220px; } }

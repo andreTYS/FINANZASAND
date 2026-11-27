@@ -3,6 +3,7 @@ import { Suspense, useEffect } from 'react';
 import { useUi } from '../store/ui';
 import { useSesion } from '../store/sesion';
 import { cerrarSesion } from '../lib/auth';
+import { useAjustes } from '../hooks/useAjustes';
 
 export const RUTAS = [
   { to: '/', icono: '📊', etiqueta: 'Panel' },
@@ -16,6 +17,7 @@ export const RUTAS = [
 export default function Layout() {
   const { menuAbierto, toggleMenu, cerrarMenu } = useUi();
   const usuario = useSesion((s) => s.usuario);
+  useAjustes(); // carga moneda y ajustes del servidor
   const loc = useLocation();
   const nav = useNavigate();
   useEffect(() => { cerrarMenu(); window.scrollTo(0, 0); }, [loc.pathname, cerrarMenu]);

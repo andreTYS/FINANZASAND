@@ -16,6 +16,7 @@ import importExport from './modules/import-export/import-export.routes.js';
 import ocr from './modules/ocr/ocr.routes.js';
 import automatizaciones from './modules/automatizaciones/automatizaciones.routes.js';
 import adjuntos from './modules/adjuntos.routes.js';
+import ajustes from './modules/ajustes/ajustes.routes.js';
 
 export function crearApp() {
   const app = express();
@@ -43,6 +44,7 @@ export function crearApp() {
   api.use('/ocr', ocr);
   api.use('/automatizaciones', automatizaciones);
   api.use('/adjuntos', adjuntos);
+  api.use('/ajustes', ajustes);
   api.use('/', importExport);
   app.use('/api', api);
 

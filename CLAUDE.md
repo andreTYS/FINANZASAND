@@ -78,7 +78,7 @@ Fase 1 — MVP (completada, ver checklist). Fase 2 (modo offline real, alertas n
 * No implementar conciliación bancaria automática (open banking).
 * No avanzar a Fase 2/3 sin pedido explícito.
 
-## 9. Variables de entorno
+## 9. Variables de entorno y ajustes desde la app
 ```
 DATABASE_URL=
 JWT_SECRET=
@@ -86,7 +86,9 @@ JWT_REFRESH_SECRET=
 GEMINI_API_KEY=
 N8N_WEBHOOK_URL=
 ```
-Opcionales: `GEMINI_MODEL`, `TZ` (zona horaria para "mes actual"; default del contenedor America/Lima), `UPLOADS_DIR`, `COOKIE_SECURE` (false solo en dev http), `CORS_ORIGIN`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL_DIAS`. Ver `.env.example`.
+**API key de Gemini, modelo, webhook de n8n y moneda se configuran desde la app** (Configuración → Integraciones), tabla `ajustes` (migración 002). Lo guardado en la app tiene prioridad sobre `GEMINI_API_KEY`/`GEMINI_MODEL`/`N8N_WEBHOOK_URL`, que quedan como valores por defecto opcionales. La API key se guarda cifrada (AES-256-GCM, clave derivada de `SETTINGS_SECRET` o `JWT_SECRET`) y nunca se devuelve al cliente (solo enmascarada). `DATABASE_URL` y los secretos JWT siguen siendo obligatoriamente de entorno.
+
+Opcionales: `SETTINGS_SECRET`, `GEMINI_MODEL` (default `gemini-flash-latest`), `TZ` (zona horaria para "mes actual"; default del contenedor America/Lima), `UPLOADS_DIR`, `COOKIE_SECURE` (false solo en dev http), `CORS_ORIGIN`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL_DIAS`. Ver `.env.example`.
 
 ## 10. Checklist de Fase 1
 * [x] Seed del usuario (Andre) — `npm run seed` con `SEED_EMAIL`/`SEED_PASSWORD`

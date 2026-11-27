@@ -8,6 +8,8 @@ import { useUi } from '../store/ui';
 import { useSesion } from '../store/sesion';
 import { cerrarSesion } from '../lib/auth';
 import { fechaHora, TIPOS, useDinero } from '../lib/formato';
+import Integraciones from '../components/Integraciones';
+import { useGuardarAjustes } from '../hooks/useAjustes';
 
 export default function Configuracion() {
   return (
@@ -15,6 +17,7 @@ export default function Configuracion() {
       <Cabecera titulo="Configuración" subtitulo="Categorías, importar/exportar y tu cuenta" />
       <div className="grid grid-igual" style={{ alignItems: 'start' }}>
         <div style={{ display: 'grid', gap: 16 }}>
+          <Integraciones />
           <Categorias />
           <Cuenta />
         </div>
@@ -198,7 +201,8 @@ function Importar() {
 
 function Cuenta() {
   const usuario = useSesion((s) => s.usuario);
-  const { moneda, setMoneda, toast } = useUi();
+  const { moneda, toast } = useUi();
+  const guardarAjustes = useGuardarAjustes();
   const [actual, setActual] = useState('');
   const [nueva, setNueva] = useState('');
   const [error, setError] = useState(null);
@@ -211,7 +215,7 @@ function Cuenta() {
     <Card titulo="Cuenta">
       <p style={{ marginBottom: 16 }}>{usuario?.nombre} · <span className="suave">{usuario?.email}</span></p>
       <Campo label="Moneda">
-        <select className="select" value={moneda} onChange={(e) => setMoneda(e.target.value)}>
+        <select className="select" value={moneda} onChange={(e) => guardarAjustes.mutate({ moneda: e.target.value }, { onSuccess: () => toast('Moneda actualizada'), onError: (er) => toast(er.message, 'error') })}>
           {['PEN', 'USD', 'EUR', 'MXN', 'COP', 'CLP', 'ARS', 'BOB'].map((m) => <option key={m}>{m}</option>)}
         </select>
       </Campo>

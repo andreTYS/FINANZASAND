@@ -31,7 +31,7 @@ DATABASE_URL=postgres://usuario:clave@localhost:5432/finanzas_test npm test
 
 ## Despliegue en el VPS (Docker + Traefik)
 
-1. Copia `.env.example` a `.env` en la raíz y completa `POSTGRES_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET`, `DOMINIO`, `GEMINI_API_KEY`, `N8N_WEBHOOK_URL`. Ajusta `TRAEFIK_NETWORK`, `TRAEFIK_ENTRYPOINT` y `TRAEFIK_CERTRESOLVER` a como está configurado tu Traefik.
+1. Copia `.env.example` a `.env` en la raíz y completa `POSTGRES_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_SECRET` y `DOMINIO`. La API key de Gemini y el webhook de n8n se configuran después **desde la app** (Configuración → Integraciones). Ajusta `TRAEFIK_NETWORK`, `TRAEFIK_ENTRYPOINT` y `TRAEFIK_CERTRESOLVER` a como está configurado tu Traefik.
 2. Levanta todo:
    ```bash
    docker compose up -d --build
@@ -42,6 +42,10 @@ DATABASE_URL=postgres://usuario:clave@localhost:5432/finanzas_test npm test
    ```
 
 Las migraciones corren solas al iniciar el backend. Postgres y el backend solo existen en la red interna; Traefik enruta el dominio al contenedor `frontend` (nginx), que sirve la PWA y hace proxy de `/api`.
+
+## Gemini (lectura de tickets)
+
+Crea una API key gratis en [Google AI Studio](https://aistudio.google.com/apikey) y pégala en Configuración → Integraciones → «Probar conexión» → «Guardar». El plan gratuito tiene límites diarios/por minuto (de sobra para uso personal) y Google puede usar los datos enviados para mejorar sus productos; si eso importa, activa facturación en el proyecto. El modelo por defecto `gemini-flash-latest` apunta siempre al Flash vigente.
 
 ## Webhook a n8n
 

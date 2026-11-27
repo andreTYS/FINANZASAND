@@ -6,6 +6,7 @@ import path from 'node:path';
 import { config } from '../../config.js';
 import { query } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errores.js';
+import { obtenerAjustes } from '../ajustes/ajustes.routes.js';
 
 const router = Router();
 
@@ -44,12 +45,12 @@ Analiza la imagen y devuelve SOLO un JSON con esta forma:
 - "categoria_sugerida" debe ser una de: CATEGORIAS, o null.
 - "confianza" entre 0 y 1. Si la imagen no es un comprobante, devuelve todo null y confianza 0.`;
 
-async function extraerConGemini(buffer, mime, categorias) {
-  if (!config.geminiApiKey) throw new HttpError(503, 'OCR no configurado (falta GEMINI_API_KEY)');
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.geminiModel)}:generateContent`;
+async function extraerConGemini(buffer, mime, categorias, { geminiApiKey, geminiModel }) {
+  if (!geminiApiKey) throw new HttpError(503, 'OCR no configurado: agrega tu API key de Gemini en Configuración');
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(geminiModel)}:generateContent`;
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': config.geminiApiKey },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiApiKey },
     signal: AbortSignal.timeout(45_000),
     body: JSON.stringify({
       contents: [{
@@ -62,6 +63,7 @@ async function extraerConGemini(buffer, mime, categorias) {
     }),
   }).catch((e) => { throw new HttpError(502, `No se pudo contactar a Gemini: ${e.message}`); });
   const raw = await r.json().catch(() => ({}));
+  if (r.status === 429) throw new HttpError(429, 'Se alcanzó el límite de uso de Gemini (plan gratuito). Intenta en un momento.');
   if (!r.ok) throw new HttpError(502, `Gemini respondió ${r.status}`, raw?.error?.message);
   const texto = raw?.candidates?.[0]?.content?.parts?.map((p) => p.text).join('') || '{}';
   let datos;
@@ -96,7 +98,8 @@ router.post('/scan', upload.single('imagen'), async (req, res) => {
   const { rows: cats } = await query(
     `SELECT id, nombre FROM categorias WHERE tipo = 'gasto' AND (usuario_id IS NULL OR usuario_id = $1)`, [uid],
   );
-  const { datos, raw } = await extraerConGemini(req.file.buffer, req.file.mimetype, cats.map((c) => c.nombre));
+  const ajustes = await obtenerAjustes(uid);
+  const { datos, raw } = await extraerConGemini(req.file.buffer, req.file.mimetype, cats.map((c) => c.nombre), ajustes);
 
   const token = crypto.randomUUID();
   const extension = MIMES[req.file.mimetype];
@@ -104,7 +107,7 @@ router.post('/scan', upload.single('imagen'), async (req, res) => {
   await fs.mkdir(dir, { recursive: true });
   await fs.writeFile(path.join(dir, `${token}${extension}`), req.file.buffer);
   await fs.writeFile(path.join(dir, `${token}.json`), JSON.stringify({
-    creado: Date.now(), mime: req.file.mimetype, extension, ocr: { extraido: datos, modelo: config.geminiModel, usage: raw?.usageMetadata ?? null },
+    creado: Date.now(), mime: req.file.mimetype, extension, ocr: { extraido: datos, modelo: ajustes.geminiModel, usage: raw?.usageMetadata ?? null },
   }));
 
   res.json({ scan_token: token, prellenado: normalizarOcr(datos, cats), extraido: datos });

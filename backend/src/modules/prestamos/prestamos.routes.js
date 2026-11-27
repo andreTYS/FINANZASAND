@@ -138,7 +138,7 @@ router.post('/:id/abonos', async (req, res) => {
     )).rows[0];
     return { abono, prestamo: act, movimiento_id: p.movimiento_id };
   });
-  dispararEvento('prestamo.abono', { id: r.movimiento_id }, { abono: r.abono, prestamo: r.prestamo });
+  dispararEvento('prestamo.abono', { id: r.movimiento_id, usuario_id: req.user.id }, { abono: r.abono, prestamo: r.prestamo });
   res.status(201).json(r);
 });
 
