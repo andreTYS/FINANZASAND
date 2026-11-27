@@ -5,6 +5,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { queryClient } from './lib/queryClient';
 import App from './App';
 import './styles/global.css';
+import './styles/v2.css';
 
 registerSW({ immediate: true });
 

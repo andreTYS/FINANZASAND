@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { useMetricas } from '../hooks/useDashboard';
-import { Card, Kpi, Cargando, ErrorMsg, Vacio, Cabecera, Segmentado } from '../components/ui';
+import { Card, Kpi, Cargando, ErrorMsg, Vacio, Cabecera, Segmentado, TooltipGrafico } from '../components/ui';
+import { ArrowDownLeft, ArrowUpRight, PiggyBank, Receipt } from 'lucide-react';
 import { useDinero, aInputFecha } from '../lib/formato';
 
+const compacto = (v) => (Math.abs(v) >= 1000 ? `${(v / 1000).toFixed(Math.abs(v) >= 10000 ? 0 : 1)}k` : v);
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 const rangoPreset = (p) => {
   const h = new Date();
@@ -47,11 +49,11 @@ export default function Metricas() {
       {isLoading ? <Cargando /> : error ? <ErrorMsg error={error} /> : (
         <>
           <div className="grid grid-kpi">
-            <Kpi etiqueta="Ingresos" valor={din(data.totales.ingresos)} clase="positivo" />
-            <Kpi etiqueta="Gastos" valor={din(data.totales.gastos)} clase="negativo" />
-            <Kpi etiqueta="Ahorro" valor={din(data.totales.ingresos - data.totales.gastos)}
+            <Kpi etiqueta="Ingresos" valor={din(data.totales.ingresos)} clase="positivo" icono={ArrowDownLeft} chip="verde" />
+            <Kpi etiqueta="Gastos" valor={din(data.totales.gastos)} clase="negativo" icono={ArrowUpRight} chip="rojo" />
+            <Kpi icono={PiggyBank} chip="morado" etiqueta="Ahorro" valor={din(data.totales.ingresos - data.totales.gastos)}
               detalle={data.totales.ingresos ? `${(((data.totales.ingresos - data.totales.gastos) / data.totales.ingresos) * 100).toFixed(0)}% de tus ingresos` : null} />
-            <Kpi etiqueta="Gasto promedio" valor={din(data.totales.ticket_promedio)} detalle={`Mayor: ${din(data.totales.gasto_mayor)}`} />
+            <Kpi icono={Receipt} chip="azul" etiqueta="Gasto promedio" valor={din(data.totales.ticket_promedio)} detalle={`Mayor: ${din(data.totales.gasto_mayor)}`} />
           </div>
 
           <div className="grid grid-igual" style={{ marginTop: 16 }}>
@@ -61,10 +63,10 @@ export default function Metricas() {
                   <div style={{ height: 220 }}>
                     <ResponsiveContainer>
                       <PieChart>
-                        <Pie data={porCat} dataKey="total" nameKey="nombre" innerRadius={55} outerRadius={90} paddingAngle={2}>
+                        <Pie data={porCat} dataKey="total" nameKey="nombre" innerRadius={62} outerRadius={95} paddingAngle={3} cornerRadius={6} stroke="none" isAnimationActive={false}>
                           {porCat.map((c) => <Cell key={c.nombre} fill={c.color} />)}
                         </Pie>
-                        <Tooltip formatter={(v) => din(v)} />
+                        <Tooltip content={<TooltipGrafico formato={din} />} cursor={{ fill: 'rgba(124,58,237,.06)' }} />
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
@@ -90,10 +92,10 @@ export default function Metricas() {
                         <linearGradient id="gI" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#22c55e" stopOpacity={0.35} /><stop offset="1" stopColor="#22c55e" stopOpacity={0} /></linearGradient>
                         <linearGradient id="gG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#7c3aed" stopOpacity={0.35} /><stop offset="1" stopColor="#7c3aed" stopOpacity={0} /></linearGradient>
                       </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="fecha" tick={{ fontSize: 11 }} tickFormatter={(f) => f.slice(8) + '/' + f.slice(5, 7)} minTickGap={16} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v) => din(v)} labelFormatter={(f) => f} />
+                      <CartesianGrid strokeDasharray="4 4" stroke="#eeeef5" vertical={false} />
+                      <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={(f) => f.slice(8) + '/' + f.slice(5, 7)} minTickGap={16} />
+                      <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={compacto} />
+                      <Tooltip content={<TooltipGrafico formato={din} etiqueta={(f) => new Date(f + 'T12:00').toLocaleDateString('es-PE', { weekday: 'short', day: 'numeric', month: 'short' })} />} />
                       <Area dataKey="ingresos" name="Ingresos" stroke="#16a34a" fill="url(#gI)" strokeWidth={2} />
                       <Area dataKey="gastos" name="Gastos" stroke="#7c3aed" fill="url(#gG)" strokeWidth={2} />
                     </AreaChart>
@@ -104,11 +106,12 @@ export default function Metricas() {
                 <div style={{ height: 180 }}>
                   <ResponsiveContainer>
                     <BarChart data={porDia} margin={{ left: -10, right: 8 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                      <XAxis dataKey="dia" tick={{ fontSize: 12 }} />
-                      <YAxis tick={{ fontSize: 11 }} />
-                      <Tooltip formatter={(v) => din(v)} />
-                      <Bar dataKey="total" name="Gasto" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                      <defs><linearGradient id="gBarDia" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#60a5fa" /><stop offset="1" stopColor="#2563eb" /></linearGradient></defs>
+                      <CartesianGrid strokeDasharray="4 4" stroke="#eeeef5" vertical={false} />
+                      <XAxis dataKey="dia" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                      <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} tickFormatter={compacto} />
+                      <Tooltip content={<TooltipGrafico formato={din} />} cursor={{ fill: 'rgba(124,58,237,.06)' }} />
+                      <Bar dataKey="total" name="Gasto" fill="url(#gBarDia)" radius={[8, 8, 0, 0]} maxBarSize={36} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>

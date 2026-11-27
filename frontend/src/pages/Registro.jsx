@@ -10,6 +10,7 @@ import MovimientoItem from '../components/MovimientoItem';
 import Filtros, { filtrosVacios } from '../components/Filtros';
 import { useUi } from '../store/ui';
 import { useDinero } from '../lib/formato';
+import { agruparPorDia } from '../lib/agrupar';
 
 export default function Registro() {
   const [params, setParams] = useSearchParams();
@@ -65,8 +66,16 @@ export default function Registro() {
           )}>
             {isLoading ? <Cargando /> : error ? <ErrorMsg error={error} /> : data.items.length === 0 ? <Vacio>No hay movimientos con estos filtros</Vacio> : (
               <div className="lista" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity .2s' }}>
-                {data.items.map((m) => (
-                  <MovimientoItem key={m.id} m={m} onClick={m.tipo.startsWith('prestamo') ? undefined : () => setEditando(m)} />
+                {agruparPorDia(data.items).map((g) => (
+                  <div key={g.clave}>
+                    <div className="dia-grupo">
+                      <span>{g.etiqueta}</span>
+                      {g.neto !== 0 && <span className={`num ${g.neto > 0 ? 'positivo' : ''}`} style={{ textTransform: 'none', letterSpacing: 0 }}>{g.neto > 0 ? '+' : '−'}{din(Math.abs(g.neto))}</span>}
+                    </div>
+                    {g.items.map((m) => (
+                      <MovimientoItem key={m.id} m={m} onClick={m.tipo.startsWith('prestamo') ? undefined : () => setEditando(m)} />
+                    ))}
+                  </div>
                 ))}
               </div>
             )}
@@ -79,7 +88,7 @@ export default function Registro() {
             )}
           </Card>
         </div>
-        <Card titulo="Nuevo movimiento" className="col-form">
+        <Card titulo="Nuevo movimiento" sub="Escribe el monto y presiona Enter" className="col-form">
           {formulario}
         </Card>
       </div>

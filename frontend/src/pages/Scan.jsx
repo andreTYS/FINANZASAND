@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Camera, Sparkles, Check } from 'lucide-react';
 import { useAjustes } from '../hooks/useAjustes';
 import { useScanTicket } from '../hooks/useOcr';
 import { useGuardarMovimiento } from '../hooks/useMovimientos';
@@ -47,6 +48,19 @@ export default function Scan() {
   return (
     <>
       <Cabecera titulo="Escanear ticket" subtitulo="Toma una foto y revisa los datos antes de guardar" />
+      <div className="pasos">
+        {['Foto', 'Lectura con IA', 'Confirmas', 'Guardado'].map((t, i) => {
+          const paso = !archivo ? 0 : scan.isPending ? 1 : datos ? 2 : 1;
+          return (
+            <span key={t} style={{ display: 'contents' }}>
+              {i > 0 && <span className="linea" />}
+              <span className={`paso ${i === paso ? 'activo' : i < paso ? 'hecho' : ''}`}>
+                <span className="num-paso">{i < paso ? <Check size={13} /> : i + 1}</span>{t}
+              </span>
+            </span>
+          );
+        })}
+      </div>
       <div className="grid grid-igual" style={{ alignItems: 'start' }}>
         {ajustes && !ajustes.gemini.configurada && (
           <div className="alerta alerta-pendiente" style={{ gridColumn: '1 / -1' }}>
@@ -59,7 +73,7 @@ export default function Scan() {
               onDragOver={(e) => { e.preventDefault(); setArrastrando(true); }} onDragLeave={() => setArrastrando(false)}
               onDrop={(e) => { e.preventDefault(); setArrastrando(false); elegir(e.dataTransfer.files?.[0]); }}
               role="button" tabIndex={0} onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}>
-              <div style={{ fontSize: '2.5rem' }}>📷</div>
+              <div className="icono-grande"><Camera /></div>
               <strong>Tomar foto o elegir imagen</strong>
               <p className="suave" style={{ fontSize: 13, marginTop: 4 }}>JPG, PNG, WEBP o HEIC · máx. 8 MB</p>
             </div>
@@ -75,7 +89,7 @@ export default function Scan() {
         <Card titulo="2. Confirma los datos">
           {!archivo && <p className="suave">Cuando subas la foto, aquí aparecerán los datos detectados para que los revises.</p>}
           {scan.isPending && (
-            <div className="cargando" style={{ gap: 12 }}><div className="spinner" /><span>Leyendo ticket con IA…</span></div>
+            <div className="cargando" style={{ gap: 12 }}><div className="spinner" /><span style={{ display: 'flex', gap: 6, alignItems: 'center' }}><Sparkles size={16} /> Leyendo ticket con IA…</span></div>
           )}
           {scan.error && (
             <div style={{ display: 'grid', gap: 12 }}>

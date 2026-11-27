@@ -4,6 +4,7 @@ import { usePrestamos, usePrestamo, useGuardarPrestamo, useBorrarPrestamo, useAb
 import { Card, Modal, Cargando, Vacio, ErrorMsg, Cabecera, Segmentado, Campo, Kpi } from '../components/ui';
 import MovimientoForm from '../components/MovimientoForm';
 import { useUi } from '../store/ui';
+import { HandCoins, Landmark, Plus } from 'lucide-react';
 import { useDinero, fecha, fechaHora, aInputFecha, ESTADOS_PRESTAMO } from '../lib/formato';
 
 export default function Prestamos() {
@@ -23,12 +24,12 @@ export default function Prestamos() {
   return (
     <>
       <Cabecera titulo="Préstamos" subtitulo="Lo que prestaste y lo que te prestaron">
-        <button className="btn btn-primario" onClick={() => setCreando(true)}>＋ Nuevo préstamo</button>
+        <button className="btn btn-primario" onClick={() => setCreando(true)}><Plus /> Nuevo préstamo</button>
       </Cabecera>
 
       <div className="grid grid-kpi" style={{ marginBottom: 16 }}>
-        <Kpi etiqueta="Me deben (filtro actual)" valor={din(porCobrar)} clase="pendiente" />
-        <Kpi etiqueta="Debo (filtro actual)" valor={din(porPagar)} clase="negativo" />
+        <Kpi etiqueta="Me deben" valor={din(porCobrar)} clase="pendiente" icono={HandCoins} chip="amarillo" detalle="Según el filtro actual" />
+        <Kpi etiqueta="Debo" valor={din(porPagar)} clase="negativo" icono={Landmark} chip="azul" detalle="Según el filtro actual" />
       </div>
 
       <Card>
@@ -43,7 +44,7 @@ export default function Prestamos() {
               const est = p.vencido ? { etiqueta: 'Vencido', badge: 'badge-rojo' } : ESTADOS_PRESTAMO[p.estado];
               return (
                 <div key={p.id} className="item clicable" onClick={() => setParams({ id: p.id })}>
-                  <div className="avatar" style={{ background: p.tipo === 'prestamo_out' ? 'var(--amarillo-100)' : 'var(--azul-100)' }}>{p.tipo === 'prestamo_out' ? '📤' : '📥'}</div>
+                  <div className={`icono-chip ${p.tipo === 'prestamo_out' ? 'chip-amarillo' : 'chip-azul'}`} style={{ width: 42, height: 42 }}>{p.tipo === 'prestamo_out' ? <HandCoins /> : <Landmark />}</div>
                   <div className="cuerpo">
                     <div className="principal-txt">{p.persona_lugar}</div>
                     <div className="secundario-txt">
