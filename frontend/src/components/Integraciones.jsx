@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Card, Campo } from './ui';
 import { useAjustes, useGuardarAjustes, useProbarGemini, useProbarN8n } from '../hooks/useAjustes';
 import { useUi } from '../store/ui';
+import { TokenN8n } from './AjustesAlertas';
 
 export default function Integraciones() {
   const { data } = useAjustes();
@@ -94,6 +95,9 @@ export default function Integraciones() {
           <button className="btn btn-primario btn-sm" disabled={guardar.isPending}>Guardar</button>
         </div>
       </form>
+
+      <hr style={{ border: 0, borderTop: '1px solid var(--color-borde)', margin: '20px 0' }} />
+      <TokenN8n />
     </Card>
   );
 }

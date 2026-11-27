@@ -4,12 +4,14 @@ import { query, transaccion } from '../../db/pool.js';
 import { HttpError, noEncontrado } from '../../middleware/errores.js';
 import { categoriaVisible } from '../categorias/categorias.routes.js';
 import { dispararEvento } from '../automatizaciones/n8n.js';
-import { redondear } from '../movimientos/movimientos.routes.js';
+import { redondear, existentePorId } from '../movimientos/movimientos.routes.js';
+import { evaluarAlertasPrestamos } from '../alertas/alertas.js';
 
 const router = Router();
 
 // prestamo_out = presté dinero (me deben) · prestamo_in = me prestaron (debo)
 const esquema = z.object({
+  id: z.string().uuid().optional(), // id del movimiento generado en el cliente (sync offline idempotente)
   tipo: z.enum(['prestamo_out', 'prestamo_in']),
   persona_lugar: z.string().trim().min(1).max(200),
   monto: z.coerce.number().positive().max(9_999_999_999.99),
@@ -68,13 +70,18 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   const d = esquema.parse(req.body);
   const uid = req.user.id;
+  const previo = await existentePorId({ query }, d.id, uid);
+  if (previo) {
+    const p = (await query('SELECT * FROM prestamos WHERE movimiento_id = $1', [previo.id])).rows[0];
+    return res.status(200).json({ ...p, tipo: previo.tipo, duplicado: true });
+  }
   const monto = redondear(d.monto);
   const r = await transaccion(async (db) => {
     await categoriaVisible(uid, d.categoria_id, db);
     const m = (await db.query(
-      `INSERT INTO movimientos (usuario_id, tipo, descripcion, monto, fecha_hora, categoria_id, origen_destino, created_via)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,'teclado') RETURNING *`,
-      [uid, d.tipo, d.descripcion ?? null, monto, d.fecha_hora, d.categoria_id ?? null, d.persona_lugar],
+      `INSERT INTO movimientos (id, usuario_id, tipo, descripcion, monto, fecha_hora, categoria_id, origen_destino, created_via)
+       VALUES (COALESCE($8::uuid, gen_random_uuid()),$1,$2,$3,$4,$5,$6,$7,'teclado') RETURNING *`,
+      [uid, d.tipo, d.descripcion ?? null, monto, d.fecha_hora, d.categoria_id ?? null, d.persona_lugar, d.id ?? null],
     )).rows[0];
     const p = (await db.query(
       `INSERT INTO prestamos (movimiento_id, persona_lugar, monto_original, saldo_pendiente, fecha_limite, estado)
@@ -84,11 +91,12 @@ router.post('/', async (req, res) => {
     return { movimiento: m, prestamo: p };
   });
   dispararEvento('prestamo.creado', r.movimiento, { prestamo: r.prestamo });
+  evaluarAlertasPrestamos(uid).catch((e) => console.error('alertas', e.message));
   res.status(201).json({ ...r.prestamo, tipo: r.movimiento.tipo });
 });
 
 router.put('/:id', async (req, res) => {
-  const d = esquema.parse(req.body);
+  const d = esquema.omit({ id: true }).parse(req.body);
   const uid = req.user.id;
   const monto = redondear(d.monto);
   const r = await transaccion(async (db) => {
@@ -122,14 +130,21 @@ router.delete('/:id', async (req, res) => {
 });
 
 router.post('/:id/abonos', async (req, res) => {
-  const d = z.object({ monto: z.coerce.number().positive(), fecha: z.coerce.date().optional() }).parse(req.body);
+  const d = z.object({ id: z.string().uuid().optional(), monto: z.coerce.number().positive(), fecha: z.coerce.date().optional() }).parse(req.body);
   const monto = redondear(d.monto);
   const r = await transaccion(async (db) => {
     const p = await prestamoDelUsuario(db, req.params.id, req.user.id, true);
+    if (d.id) {
+      const ya = (await db.query('SELECT * FROM abonos_prestamo WHERE id = $1', [d.id])).rows[0];
+      if (ya) {
+        if (ya.prestamo_id !== p.id) throw new HttpError(409, 'Identificador en uso');
+        return { abono: ya, prestamo: (await db.query('SELECT * FROM prestamos WHERE id = $1', [p.id])).rows[0], movimiento_id: p.movimiento_id, duplicado: true };
+      }
+    }
     if (monto > p.saldo_pendiente) throw new HttpError(400, `El abono supera el saldo pendiente (${p.saldo_pendiente})`);
     const abono = (await db.query(
-      'INSERT INTO abonos_prestamo (prestamo_id, monto, fecha) VALUES ($1,$2,$3) RETURNING *',
-      [p.id, monto, d.fecha ?? new Date()],
+      'INSERT INTO abonos_prestamo (id, prestamo_id, monto, fecha) VALUES (COALESCE($4::uuid, gen_random_uuid()),$1,$2,$3) RETURNING *',
+      [p.id, monto, d.fecha ?? new Date(), d.id ?? null],
     )).rows[0];
     const saldo = redondear(p.saldo_pendiente - monto);
     const act = (await db.query(
@@ -138,6 +153,7 @@ router.post('/:id/abonos', async (req, res) => {
     )).rows[0];
     return { abono, prestamo: act, movimiento_id: p.movimiento_id };
   });
+  if (r.duplicado) return res.status(200).json(r);
   dispararEvento('prestamo.abono', { id: r.movimiento_id, usuario_id: req.user.id }, { abono: r.abono, prestamo: r.prestamo });
   res.status(201).json(r);
 });

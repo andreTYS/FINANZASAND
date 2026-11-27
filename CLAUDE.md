@@ -63,7 +63,13 @@ Nuevas migraciones: agregar `00N_descripcion.sql`; se aplican al arrancar el bac
 6. Cada disparo queda en `automatizaciones_log` (`enviado`, `error_*`, u `omitido_sin_webhook`).
 
 ## 6. Orden de construcción
-Fase 1 — MVP (completada, ver checklist). Fase 2 (modo offline real, alertas n8n, categorización automática) y Fase 3 (Google Sheets, resúmenes, integraciones) **no se empiezan** sin pedido explícito.
+Fase 1 — MVP (completada). Fase 2 — offline, alertas y categorización (completada, ver checklist 10b). Fase 3 (Google Sheets, resúmenes, integraciones) **no se empieza** sin pedido explícito.
+
+### Fase 2 — cómo está hecho
+* **Offline real**: las altas por teclado (movimientos, préstamos, abonos) llevan un `id` UUID generado en el cliente. Sin red se guardan en una cola local (`frontend/src/store/cola.js`, persistida) y `lib/sync.js` las envía en orden al volver la conexión, cada 30 s y al abrir la app. El backend es **idempotente** por ese id (reintento = 200 con el registro existente; id de otro usuario = 409). Las lecturas se persisten con `PersistQueryClientProvider` (7 días) y, sin red al abrir, se entra con el usuario guardado (`iniciarOffline`). Editar, borrar, escanear e importar requieren conexión. Al cerrar sesión se borran la cola y la caché local.
+* **Categorización automática** (`backend/src/modules/categorizacion/categorizador.js`): 1) historial del usuario (misma contraparte o descripción, solo categorías elegidas a mano), 2) palabras clave. Si confianza ≥ 0,65 y el usuario no eligió categoría, se asigna al crear/importar con `movimientos.categoria_auto = true`. El formulario muestra la sugerencia en vivo (`GET /api/categorias/sugerir`). Si el usuario cambia la categoría, deja de ser "auto".
+* **Alertas** (`backend/src/modules/alertas/`): gasto grande (umbral), presupuesto por categoría al 80 % y 100 % (tabla `presupuestos`), préstamos por vencer (N días) y vencidos. Tabla `alertas` con `clave` única → nunca se repiten. Se evalúan al crear movimientos/préstamos, al abrir la campana y cada hora (programador en el proceso; `ALERTAS_PROGRAMADOR=false` lo apaga). Cada alerta nueva se envía al webhook de n8n (`evento: alerta.<tipo>`) y queda en `automatizaciones_log`.
+* **n8n escribe de vuelta** solo vía API: `/api/n8n/*` con token de integración (Configuración → Integraciones; se guarda su hash). Hoy: `GET /api/n8n/categorias` y `PATCH /api/n8n/movimientos/:id/categoria` (no pisa categorías elegidas por el usuario).
 
 ## 7. UX/UI
 * Paleta: morado y azul primarios, blanco de fondo, verde = positivo, amarillo = pendiente. Tokens en `frontend/src/styles/tokens.css`.
@@ -88,7 +94,7 @@ N8N_WEBHOOK_URL=
 ```
 **API key de Gemini, modelo, webhook de n8n y moneda se configuran desde la app** (Configuración → Integraciones), tabla `ajustes` (migración 002). Lo guardado en la app tiene prioridad sobre `GEMINI_API_KEY`/`GEMINI_MODEL`/`N8N_WEBHOOK_URL`, que quedan como valores por defecto opcionales. La API key se guarda cifrada (AES-256-GCM, clave derivada de `SETTINGS_SECRET` o `JWT_SECRET`) y nunca se devuelve al cliente (solo enmascarada). `DATABASE_URL` y los secretos JWT siguen siendo obligatoriamente de entorno.
 
-Opcionales: `SETTINGS_SECRET`, `GEMINI_MODEL` (default `gemini-flash-latest`), `TZ` (zona horaria para "mes actual"; default del contenedor America/Lima), `UPLOADS_DIR`, `COOKIE_SECURE` (false solo en dev http), `CORS_ORIGIN`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL_DIAS`. Ver `.env.example`.
+Opcionales: `ALERTAS_PROGRAMADOR` (false = sin revisión horaria), `SETTINGS_SECRET`, `GEMINI_MODEL` (default `gemini-flash-latest`), `TZ` (zona horaria para "mes actual"; default del contenedor America/Lima), `UPLOADS_DIR`, `COOKIE_SECURE` (false solo en dev http), `CORS_ORIGIN`, `JWT_ACCESS_TTL`, `JWT_REFRESH_TTL_DIAS`. Ver `.env.example`.
 
 ## 10. Checklist de Fase 1
 * [x] Seed del usuario (Andre) — `npm run seed` con `SEED_EMAIL`/`SEED_PASSWORD`
@@ -101,6 +107,11 @@ Opcionales: `SETTINGS_SECRET`, `GEMINI_MODEL` (default `gemini-flash-latest`), `
 * [x] Scan de ticket (Gemini Vision) + confirmación
 * [x] Categorías y filtros
 * [x] PWA instalable (manifest + service worker)
+
+## 10b. Checklist de Fase 2
+* [x] Modo offline real (cola local + sync idempotente + caché persistida + sesión offline)
+* [x] Alertas por n8n (gasto grande, presupuestos 80/100 %, préstamos por vencer/vencidos) + campana en la app
+* [x] Categorización automática (historial + palabras clave) + escritura de vuelta de n8n con token
 
 ## Comandos
 * Backend dev: `cd backend && npm run dev` (necesita `backend/.env`)

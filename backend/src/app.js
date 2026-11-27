@@ -17,6 +17,8 @@ import ocr from './modules/ocr/ocr.routes.js';
 import automatizaciones from './modules/automatizaciones/automatizaciones.routes.js';
 import adjuntos from './modules/adjuntos.routes.js';
 import ajustes from './modules/ajustes/ajustes.routes.js';
+import alertas from './modules/alertas/alertas.routes.js';
+import n8nApi from './modules/n8n/n8n.routes.js';
 
 export function crearApp() {
   const app = express();
@@ -32,6 +34,9 @@ export function crearApp() {
   });
 
   app.use('/api/auth', auth);
+  // API para n8n (token de integración propio, no JWT)
+  n8nApi.param('id', validarUuid);
+  app.use('/api/n8n', express.json({ limit: '100kb' }), n8nApi);
 
   // Todo lo demás requiere JWT; cada query filtra por req.user.id
   const api = express.Router();
@@ -45,6 +50,8 @@ export function crearApp() {
   api.use('/automatizaciones', automatizaciones);
   api.use('/adjuntos', adjuntos);
   api.use('/ajustes', ajustes);
+  alertas.param('id', validarUuid);
+  api.use('/alertas', alertas);
   api.use('/', importExport);
   app.use('/api', api);
 

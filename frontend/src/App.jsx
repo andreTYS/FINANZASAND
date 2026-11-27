@@ -1,7 +1,8 @@
 import { lazy, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSesion } from './store/sesion';
-import { refrescarSesion } from './lib/api';
+import { refrescarSesion, usuarioGuardado } from './lib/api';
+import { iniciarSincronizacion } from './lib/sync';
 import Layout from './components/Layout';
 import { Cargando, Toasts } from './components/ui';
 import Login from './pages/Login';
@@ -19,8 +20,14 @@ export default function App() {
 
   // Restaurar sesión desde la cookie de refresh al abrir la app
   useEffect(() => {
-    refrescarSesion().catch(() => useSesion.getState().cerrar());
+    refrescarSesion().catch((e) => {
+      const u = usuarioGuardado();
+      if (e.sinConexion && u) useSesion.getState().iniciarOffline(u);
+      else useSesion.getState().cerrar();
+    });
   }, []);
+
+  useEffect(() => (estado === 'autenticado' ? iniciarSincronizacion() : undefined), [estado]);
 
   if (estado === 'verificando') return <div style={{ height: '100vh', display: 'grid', placeItems: 'center' }}><Cargando /></div>;
 

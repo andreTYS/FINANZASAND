@@ -4,6 +4,7 @@ import { config } from '../../config.js';
 import { query } from '../../db/pool.js';
 import { cifrar, descifrar } from '../../lib/cifrado.js';
 import { HttpError } from '../../middleware/errores.js';
+import { hashToken, nuevoToken } from '../n8n/n8n.routes.js';
 
 const router = Router();
 export const MONEDAS = ['PEN', 'USD', 'EUR', 'MXN', 'COP', 'CLP', 'ARS', 'BOB'];
@@ -22,6 +23,10 @@ export async function obtenerAjustes(usuarioId) {
     geminiModel: a.gemini_model || config.geminiModel,
     n8nWebhookUrl: a.n8n_webhook_url ?? config.n8nWebhookUrl ?? '',
     moneda: a.moneda || 'PEN',
+    alertaGastoGrande: a.alerta_gasto_grande ?? null,
+    alertaPresupuesto: a.alerta_presupuesto ?? true,
+    alertaPrestamoDias: a.alerta_prestamo_dias ?? 3,
+    n8nTokenConfigurado: !!a.n8n_token_hash,
   };
 }
 
@@ -33,6 +38,8 @@ async function vistaPublica(uid) {
     gemini: { configurada: !!a.geminiApiKey, origen: a.geminiApiKeyOrigen, key_mascara: enmascarar(a.geminiApiKey), modelo: a.geminiModel },
     n8n: { webhook_url: a.n8nWebhookUrl || '' },
     moneda: a.moneda,
+    alertas: { gasto_grande: a.alertaGastoGrande, presupuesto: a.alertaPresupuesto, prestamo_dias: a.alertaPrestamoDias },
+    n8n_token: { configurado: a.n8nTokenConfigurado },
   };
 }
 
@@ -44,6 +51,9 @@ router.put('/', async (req, res) => {
     gemini_model: z.string().trim().regex(/^[\w.-]{3,80}$/, 'Modelo inválido').optional(),
     n8n_webhook_url: z.union([z.literal(''), z.string().trim().url().max(500).refine((u) => /^https?:\/\//.test(u), 'Debe ser http(s)')]).optional(),
     moneda: z.enum(MONEDAS).optional(),
+    alerta_gasto_grande: z.coerce.number().positive().max(9_999_999_999).nullable().optional(),
+    alerta_presupuesto: z.boolean().optional(),
+    alerta_prestamo_dias: z.coerce.number().int().min(0).max(60).optional(),
   }).parse(req.body);
 
   const campos = {};
@@ -51,6 +61,7 @@ router.put('/', async (req, res) => {
   if (d.gemini_model !== undefined) campos.gemini_model = d.gemini_model;
   if (d.n8n_webhook_url !== undefined) campos.n8n_webhook_url = d.n8n_webhook_url;
   if (d.moneda !== undefined) campos.moneda = d.moneda;
+  for (const k of ['alerta_gasto_grande', 'alerta_presupuesto', 'alerta_prestamo_dias']) if (d[k] !== undefined) campos[k] = d[k];
   const cols = Object.keys(campos);
   if (cols.length) {
     await query(
@@ -90,6 +101,22 @@ router.post('/probar-n8n', async (req, res) => {
   }).catch((e) => { throw new HttpError(502, `No se pudo contactar el webhook: ${e.name === 'TimeoutError' ? 'tiempo agotado' : e.message}`); });
   if (!r.ok) throw new HttpError(502, `El webhook respondió ${r.status}`);
   res.json({ ok: true, status: r.status });
+});
+
+/** Genera (o rota) el token con el que n8n escribe de vuelta vía /api/n8n. Se muestra una sola vez. */
+router.post('/n8n-token', async (req, res) => {
+  const token = nuevoToken();
+  await query(
+    `INSERT INTO ajustes (usuario_id, n8n_token_hash) VALUES ($1, $2)
+     ON CONFLICT (usuario_id) DO UPDATE SET n8n_token_hash = EXCLUDED.n8n_token_hash, updated_at = now()`,
+    [req.user.id, hashToken(token)],
+  );
+  res.status(201).json({ token });
+});
+
+router.delete('/n8n-token', async (req, res) => {
+  await query('UPDATE ajustes SET n8n_token_hash = NULL WHERE usuario_id = $1', [req.user.id]);
+  res.status(204).end();
 });
 
 export default router;

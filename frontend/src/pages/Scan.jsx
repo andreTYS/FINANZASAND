@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Camera, Sparkles, Check } from 'lucide-react';
 import { useAjustes } from '../hooks/useAjustes';
+import { useEnLinea } from '../hooks/useEnLinea';
 import { useScanTicket } from '../hooks/useOcr';
 import { useGuardarMovimiento } from '../hooks/useMovimientos';
 import { Card, Cabecera, ErrorMsg } from '../components/ui';
@@ -21,12 +22,14 @@ export default function Scan() {
   const toast = useUi((s) => s.toast);
   const nav = useNavigate();
   const { data: ajustes } = useAjustes();
+  const enLinea = useEnLinea();
 
   useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
 
   function elegir(f) {
     if (!f) return;
     if (!f.type.startsWith('image/')) return toast('Selecciona una imagen', 'error');
+    if (!navigator.onLine) return toast('Necesitas conexión para leer el ticket', 'error');
     setArchivo(f);
     setPreview(URL.createObjectURL(f));
     scan.reset();
@@ -62,6 +65,11 @@ export default function Scan() {
         })}
       </div>
       <div className="grid grid-igual" style={{ alignItems: 'start' }}>
+        {!enLinea && (
+          <div className="alerta alerta-pendiente" style={{ gridColumn: '1 / -1' }}>
+            Sin conexión: la lectura de tickets necesita internet. Puedes <Link to="/registro">registrar el gasto a mano</Link> y se sincronizará después.
+          </div>
+        )}
         {ajustes && !ajustes.gemini.configurada && (
           <div className="alerta alerta-pendiente" style={{ gridColumn: '1 / -1' }}>
             Para leer tickets necesitas una API key de Gemini (gratis). <Link to="/configuracion">Configúrala aquí →</Link>

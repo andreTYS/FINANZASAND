@@ -37,7 +37,7 @@ export default function Prestamos() {
           <Segmentado valor={tipo} onChange={setTipo} opciones={[{ valor: '', etiqueta: 'Todos' }, { valor: 'prestamo_out', etiqueta: 'Presté' }, { valor: 'prestamo_in', etiqueta: 'Me prestaron' }]} />
           <Segmentado valor={estado} onChange={setEstado} opciones={[{ valor: 'abiertos', etiqueta: 'Abiertos' }, { valor: 'pagado_cobrado', etiqueta: 'Saldados' }, { valor: '', etiqueta: 'Todos' }]} />
         </div>
-        {isLoading ? <Cargando /> : error ? <ErrorMsg error={error} /> : data.length === 0 ? <Vacio emoji="🤝">No hay préstamos aquí</Vacio> : (
+        {isLoading ? <Cargando /> : error && !data.length ? <ErrorMsg error={error} /> : data.length === 0 ? <Vacio emoji="🤝">No hay préstamos aquí</Vacio> : (
           <div className="lista">
             {data.map((p) => {
               const pct = p.monto_original ? (p.pagado / p.monto_original) * 100 : 0;
@@ -90,7 +90,8 @@ function DetallePrestamo({ id, onClose }) {
   const err = (e) => toast(e.message, 'error');
 
   if (isLoading) return <Modal titulo="Préstamo" onClose={onClose}><Cargando /></Modal>;
-  if (error) return <Modal titulo="Préstamo" onClose={onClose}><ErrorMsg error={error} /></Modal>;
+  if (!p) return <Modal titulo="Préstamo" onClose={onClose}><p className="suave">Sin conexión: abre este préstamo cuando vuelvas a estar en línea.</p></Modal>;
+  if (error && !p) return <Modal titulo="Préstamo" onClose={onClose}><ErrorMsg error={error} /></Modal>;
 
   if (editar) {
     return (

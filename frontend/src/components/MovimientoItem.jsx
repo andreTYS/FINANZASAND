@@ -1,4 +1,4 @@
-import { ArrowDownLeft, ArrowUpRight, HandCoins, Camera, FileUp } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, HandCoins, Camera, FileUp, Sparkles, CloudOff } from 'lucide-react';
 import { TIPOS, useDinero } from '../lib/formato';
 
 const hora = (d) => new Date(d).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' });
@@ -18,13 +18,17 @@ export default function MovimientoItem({ m, onClick, conFecha = false }) {
       <div className="cuerpo">
         <div className="principal-txt">{m.descripcion || m.origen_destino || m.categoria_nombre || t.etiqueta}</div>
         <div className="secundario-txt" style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-          <span>{cuando}</span>·<span>{m.categoria_nombre || 'Sin categoría'}</span>
+          <span>{cuando}</span>·<span>{m.categoria_nombre || (m.pendiente ? 'Se categoriza al sincronizar' : 'Sin categoría')}</span>
+          {m.categoria_auto && <span className="auto-chip" title="Categoría asignada automáticamente"><Sparkles />auto</span>}
           {m.origen_destino && m.descripcion && <>·<span>{m.origen_destino}</span></>}
           {m.created_via === 'scan' && <Camera size={12} aria-label="Escaneado" />}
           {m.created_via === 'import' && <FileUp size={12} aria-label="Importado" />}
         </div>
       </div>
-      <div className={`monto num ${t.clase}`}>{t.signo} {din(m.monto)}</div>
+      <div style={{ textAlign: 'right' }}>
+        <div className={`monto num ${t.clase}`}>{t.signo} {din(m.monto)}</div>
+        {m.pendiente && <span className={`badge ${m.error ? 'badge-rojo' : 'badge-pendiente'}`}><CloudOff size={11} />{m.error ? 'Error' : 'Pendiente'}</span>}
+      </div>
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { query, transaccion } from '../../db/pool.js';
 import { HttpError } from '../../middleware/errores.js';
 import { esquemaFiltros, whereMovimientos, SELECT_MOVIMIENTO } from '../movimientos/filtros.js';
 import { parsearArchivo, claveDuplicado } from './parseo.js';
+import { sugerirCategoria, UMBRAL_AUTO } from '../categorizacion/categorizador.js';
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -133,6 +134,20 @@ router.post('/import', upload.single('archivo'), async (req, res) => {
   const validas = parseado.filas.filter((r) => r.datos);
   if (!parseado.filas.length) throw new HttpError(400, 'El archivo no tiene filas de datos');
 
+  // Categorización automática de filas sin categoría (cacheada por texto para no repetir consultas)
+  const cache = new Map();
+  for (const r of validas) {
+    if (r.datos.categoria_id) continue;
+    const k = `${r.datos.tipo}|${r.datos.descripcion ?? ''}|${r.datos.origen_destino ?? ''}`.toLowerCase();
+    if (!cache.has(k)) cache.set(k, await sugerirCategoria(uid, r.datos));
+    const sug = cache.get(k);
+    if (sug && sug.confianza >= UMBRAL_AUTO) {
+      r.datos.categoria_id = sug.categoria_id;
+      r.datos.categoria_nombre = `${sug.nombre} (auto)`;
+      r.datos.categoria_auto = true;
+    }
+  }
+
   // Duplicados contra la BD (mismo rango de fechas) y dentro del propio archivo
   const fechas = validas.map((r) => r.datos.fecha_hora.getTime());
   const existentes = new Set();
@@ -167,9 +182,9 @@ router.post('/import', upload.single('archivo'), async (req, res) => {
   const imp = await transaccion(async (db) => {
     for (const { datos: d } of aInsertar) {
       await db.query(
-        `INSERT INTO movimientos (usuario_id, tipo, descripcion, cantidad, monto, fecha_hora, categoria_id, origen_destino, created_via)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'import')`,
-        [uid, d.tipo, d.descripcion, d.cantidad, d.monto, d.fecha_hora, d.categoria_id, d.origen_destino],
+        `INSERT INTO movimientos (usuario_id, tipo, descripcion, cantidad, monto, fecha_hora, categoria_id, origen_destino, created_via, categoria_auto)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'import',$9)`,
+        [uid, d.tipo, d.descripcion, d.cantidad, d.monto, d.fecha_hora, d.categoria_id, d.origen_destino, !!d.categoria_auto],
       );
     }
     return (await db.query(

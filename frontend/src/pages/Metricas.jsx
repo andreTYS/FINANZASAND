@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, AreaChart, Area, XAxis, YAxis, CartesianGrid, BarChart, Bar } from 'recharts';
 import { useMetricas } from '../hooks/useDashboard';
-import { Card, Kpi, Cargando, ErrorMsg, Vacio, Cabecera, Segmentado, TooltipGrafico } from '../components/ui';
+import { Card, Kpi, SinDatosOffline, Cargando, ErrorMsg, Vacio, Cabecera, Segmentado, TooltipGrafico } from '../components/ui';
 import { ArrowDownLeft, ArrowUpRight, PiggyBank, Receipt } from 'lucide-react';
 import { useDinero, aInputFecha } from '../lib/formato';
 
@@ -46,7 +46,7 @@ export default function Metricas() {
         </div>
       </Card>
 
-      {isLoading ? <Cargando /> : error ? <ErrorMsg error={error} /> : (
+      {isLoading ? <Cargando /> : error && !data ? <ErrorMsg error={error} /> : !data ? <SinDatosOffline /> : (
         <>
           <div className="grid grid-kpi">
             <Kpi etiqueta="Ingresos" valor={din(data.totales.ingresos)} clase="positivo" icono={ArrowDownLeft} chip="verde" />
