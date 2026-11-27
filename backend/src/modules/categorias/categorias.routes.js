@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { query } from '../../db/pool.js';
 import { HttpError, noEncontrado } from '../../middleware/errores.js';
+import { sugerirCategoria } from '../categorizacion/categorizador.js';
 
 const router = Router();
 
@@ -25,12 +26,40 @@ export async function categoriaVisible(usuarioId, categoriaId, db = { query }) {
 
 router.get('/', async (req, res) => {
   const { rows } = await query(
-    `SELECT id, nombre, color, icono, tipo, (usuario_id IS NULL) AS global
-     FROM categorias WHERE usuario_id IS NULL OR usuario_id = $1
-     ORDER BY tipo, global DESC, nombre`,
+    `SELECT c.id, c.nombre, c.color, c.icono, c.tipo, (c.usuario_id IS NULL) AS global, p.monto_mensual AS presupuesto
+     FROM categorias c LEFT JOIN presupuestos p ON p.categoria_id = c.id AND p.usuario_id = $1
+     WHERE c.usuario_id IS NULL OR c.usuario_id = $1
+     ORDER BY c.tipo, global DESC, c.nombre`,
     [req.user.id],
   );
   res.json(rows);
+});
+
+/** GET /api/categorias/sugerir?tipo=gasto&descripcion=..&origen_destino=.. */
+router.get('/sugerir', async (req, res) => {
+  const q = z.object({
+    tipo: z.enum(['ingreso', 'gasto']),
+    descripcion: z.string().max(300).optional(),
+    origen_destino: z.string().max(200).optional(),
+  }).parse(req.query);
+  res.json({ sugerencia: await sugerirCategoria(req.user.id, q) });
+});
+
+/** PUT /api/categorias/:id/presupuesto { monto_mensual | null } — vale también para categorías globales */
+router.put('/:id/presupuesto', async (req, res) => {
+  const { monto_mensual } = z.object({ monto_mensual: z.coerce.number().positive().max(9_999_999_999).nullable() }).parse(req.body);
+  const cat = await categoriaVisible(req.user.id, req.params.id);
+  if (cat.tipo !== 'gasto') throw new HttpError(400, 'Solo las categorías de gasto tienen presupuesto');
+  if (monto_mensual == null) {
+    await query('DELETE FROM presupuestos WHERE usuario_id = $1 AND categoria_id = $2', [req.user.id, cat.id]);
+  } else {
+    await query(
+      `INSERT INTO presupuestos (usuario_id, categoria_id, monto_mensual) VALUES ($1,$2,$3)
+       ON CONFLICT (usuario_id, categoria_id) DO UPDATE SET monto_mensual = EXCLUDED.monto_mensual`,
+      [req.user.id, cat.id, Math.round(monto_mensual * 100) / 100],
+    );
+  }
+  res.json({ id: cat.id, presupuesto: monto_mensual });
 });
 
 router.post('/', async (req, res) => {

@@ -9,6 +9,8 @@ import { useSesion } from '../store/sesion';
 import { cerrarSesion } from '../lib/auth';
 import { fechaHora, TIPOS, useDinero } from '../lib/formato';
 import Integraciones from '../components/Integraciones';
+import AjustesAlertas from '../components/AjustesAlertas';
+import { useQueryClient } from '@tanstack/react-query';
 import { useGuardarAjustes } from '../hooks/useAjustes';
 
 export default function Configuracion() {
@@ -22,6 +24,7 @@ export default function Configuracion() {
           <Cuenta />
         </div>
         <div style={{ display: 'grid', gap: 16 }}>
+          <AjustesAlertas />
           <Exportar />
           <Importar />
           <Automatizaciones />
@@ -40,6 +43,8 @@ function Categorias() {
   const borrar = useBorrarCategoria();
   const toast = useUi((s) => s.toast);
   const lista = data.filter((c) => c.tipo === tipo);
+  const [pres, setPres] = useState(null);
+  const din = useDinero();
   return (
     <Card titulo="Categorías" accion={<button className="btn btn-secundario btn-sm" onClick={() => setEdit({ nombre: '', color: COLORES[0], icono: '', tipo })}>＋ Nueva</button>}>
       <Segmentado valor={tipo} onChange={setTipo} opciones={[{ valor: 'gasto', etiqueta: 'Gastos' }, { valor: 'ingreso', etiqueta: 'Ingresos' }, { valor: 'prestamo', etiqueta: 'Préstamos' }]} />
@@ -47,7 +52,11 @@ function Categorias() {
         {lista.map((c) => (
           <div key={c.id} className="item">
             <div className="avatar" style={{ background: `${c.color || '#94a3b8'}1a`, color: c.color }}>{c.icono || '•'}</div>
-            <div className="cuerpo"><div className="principal-txt">{c.nombre}</div>{c.global && <div className="secundario-txt">Predeterminada</div>}</div>
+            <div className="cuerpo">
+              <div className="principal-txt">{c.nombre}</div>
+              <div className="secundario-txt">{c.global ? 'Predeterminada' : 'Propia'}{c.presupuesto ? ` · Presupuesto ${din(c.presupuesto)}/mes` : ''}</div>
+            </div>
+            {c.tipo === 'gasto' && <button className="btn btn-fantasma btn-sm" onClick={() => setPres(c)}>{c.presupuesto ? 'Presupuesto' : '+ Presupuesto'}</button>}
             {!c.global && (
               <>
                 <button className="btn btn-fantasma btn-sm" onClick={() => setEdit(c)}>Editar</button>
@@ -59,7 +68,38 @@ function Categorias() {
         ))}
       </div>
       {edit && <EditorCategoria cat={edit} onClose={() => setEdit(null)} />}
+      {pres && <EditorPresupuesto cat={pres} onClose={() => setPres(null)} />}
     </Card>
+  );
+}
+
+function EditorPresupuesto({ cat, onClose }) {
+  const [monto, setMonto] = useState(cat.presupuesto ?? '');
+  const [guardando, setGuardando] = useState(false);
+  const qc = useQueryClient();
+  const toast = useUi((s) => s.toast);
+  const guardar = async (valor) => {
+    setGuardando(true);
+    try {
+      await api(`/categorias/${cat.id}/presupuesto`, { method: 'PUT', body: { monto_mensual: valor } });
+      qc.invalidateQueries({ queryKey: ['categorias'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      toast(valor == null ? 'Presupuesto quitado' : 'Presupuesto guardado');
+      onClose();
+    } catch (e) { toast(e.message, 'error'); } finally { setGuardando(false); }
+  };
+  return (
+    <Modal titulo={`Presupuesto: ${cat.nombre}`} onClose={onClose}>
+      <form onSubmit={(e) => { e.preventDefault(); const n = Number(String(monto).replace(',', '.')); if (n > 0) guardar(n); }} style={{ display: 'grid', gap: 12 }}>
+        <Campo label="Monto máximo al mes" ayuda="Recibirás alertas al llegar al 80% y al 100%.">
+          <input className="input input-monto num" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} autoFocus placeholder="0.00" />
+        </Campo>
+        <div className="acciones">
+          {cat.presupuesto && <button type="button" className="btn btn-fantasma negativo" onClick={() => guardar(null)} disabled={guardando}>Quitar</button>}
+          <button className="btn btn-primario" disabled={guardando || !(Number(String(monto).replace(',', '.')) > 0)}>Guardar</button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 

@@ -5,6 +5,8 @@ import { useUi } from '../store/ui';
 import { useSesion } from '../store/sesion';
 import { cerrarSesion } from '../lib/auth';
 import { useAjustes } from '../hooks/useAjustes';
+import EstadoConexion from './EstadoConexion';
+import Alertas from './Alertas';
 
 export const RUTAS = [
   { to: '/', icono: LayoutDashboard, etiqueta: 'Panel' },
@@ -49,7 +51,9 @@ export default function Layout() {
           <button className="hamburguesa" onClick={toggleMenu} aria-label="Abrir menú" aria-expanded={menuAbierto}><Menu /></button>
           <img src="/favicon.svg" alt="" />
           <span className="titulo">{actual?.etiqueta ?? 'Finanzas'}</span>
+          <Alertas avisos />
         </header>
+        <EstadoConexion />
         <main className="contenido">
           <Suspense fallback={<div className="cargando"><div className="spinner" /></div>}>
             <div className="pagina" key={loc.pathname}><Outlet /></div>

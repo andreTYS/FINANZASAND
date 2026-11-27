@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { TrendingUp, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useUi } from '../store/ui';
+import Alertas from './Alertas';
 
 export function Card({ titulo, sub, accion, children, className = '', ...rest }) {
   return (
@@ -122,6 +123,10 @@ export function Modal({ titulo, onClose, children }) {
   );
 }
 
+/** Estado para consultas sin datos en caché mientras no hay conexión. */
+export const SinDatosOffline = () => (
+  <div className="vacio"><span className="emoji">📡</span>Sin conexión y sin datos guardados para esta vista.<br />Se cargará al volver a estar en línea.</div>
+);
 export const Cargando = () => <div className="cargando"><div className="spinner" /></div>;
 export const Vacio = ({ emoji = '🗂️', children }) => <div className="vacio"><span className="emoji">{emoji}</span>{children}</div>;
 export const ErrorMsg = ({ error }) => (error ? <div className="alerta alerta-error">{error.message || String(error)}</div> : null);
@@ -143,7 +148,10 @@ export function Cabecera({ titulo, subtitulo, saludo, children }) {
         <h1>{titulo}</h1>
         {subtitulo && <p className="suave">{subtitulo}</p>}
       </div>
-      {children && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{children}</div>}
+      <div className="cabecera-acciones">
+        {children}
+        <span className="solo-desktop"><Alertas /></span>
+      </div>
     </div>
   );
 }

@@ -37,7 +37,7 @@ export function whereMovimientos(usuarioId, f, alias = 'm') {
 
 export const SELECT_MOVIMIENTO = `
   SELECT m.id, m.tipo, m.descripcion, m.cantidad, m.monto, m.fecha_hora, m.categoria_id,
-         m.origen_destino, m.adjunto_url, m.created_via, m.created_at, m.updated_at,
+         m.origen_destino, m.adjunto_url, m.created_via, m.created_at, m.updated_at, m.categoria_auto,
          c.nombre AS categoria_nombre, c.color AS categoria_color, c.icono AS categoria_icono,
          p.id AS prestamo_id
   FROM movimientos m

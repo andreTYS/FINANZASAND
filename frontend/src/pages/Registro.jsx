@@ -11,6 +11,8 @@ import Filtros, { filtrosVacios } from '../components/Filtros';
 import { useUi } from '../store/ui';
 import { useDinero } from '../lib/formato';
 import { agruparPorDia } from '../lib/agrupar';
+import { useCola } from '../store/cola';
+import { useCategorias } from '../hooks/useCategorias';
 
 export default function Registro() {
   const [params, setParams] = useSearchParams();
@@ -25,11 +27,27 @@ export default function Registro() {
   const toast = useUi((s) => s.toast);
   const din = useDinero();
   const nuevo = params.get('nuevo') === '1';
+  const ops = useCola((st) => st.ops);
+  const { data: cats = [] } = useCategorias();
+  // Altas hechas sin conexión: se muestran arriba (primera página) hasta que se sincronicen
+  const pendientes = useMemo(() => (page !== 1 ? [] : ops.filter((o) => o.clase !== 'abono').map((o) => {
+    const c = cats.find((x) => x.id === o.body.categoria_id);
+    return {
+      ...o.body, pendiente: true, error: o.error, created_via: 'teclado',
+      origen_destino: o.body.origen_destino ?? o.body.persona_lugar,
+      categoria_nombre: c?.nombre, categoria_color: c?.color, categoria_icono: c?.icono,
+    };
+  })), [ops, cats, page]);
+  const items = data ? [...pendientes.filter((p) => !data.items.some((m) => m.id === p.id)), ...data.items] : pendientes;
 
   const crear = (payload, reset) => {
     const esPrestamo = payload.tipo.startsWith('prestamo');
     (esPrestamo ? guardarPrestamo : guardar).mutate(payload, {
-      onSuccess: () => { toast(esPrestamo ? 'Préstamo registrado' : 'Movimiento guardado'); reset(); if (nuevo) setParams({}); },
+      onSuccess: (r) => {
+        toast(r?.pendiente ? 'Guardado sin conexión: se sincronizará solo' : esPrestamo ? 'Préstamo registrado'
+          : r?.categoria_auto ? `Movimiento guardado · categoría: ${cats.find((c) => c.id === r.categoria_id)?.nombre ?? 'auto'}` : 'Movimiento guardado', r?.pendiente ? 'aviso' : 'ok');
+        reset(); if (nuevo) setParams({});
+      },
       onError: (e) => toast(e.message, 'error'),
     });
   };
@@ -64,16 +82,16 @@ export default function Registro() {
               <span className="positivo">+{din(data.resumen.ingresos)}</span> · <span className="negativo">−{din(data.resumen.gastos)}</span>
             </span>
           )}>
-            {isLoading ? <Cargando /> : error ? <ErrorMsg error={error} /> : data.items.length === 0 ? <Vacio>No hay movimientos con estos filtros</Vacio> : (
+            {isLoading && !items.length ? <Cargando /> : error && !items.length ? <ErrorMsg error={error} /> : items.length === 0 ? <Vacio>No hay movimientos con estos filtros</Vacio> : (
               <div className="lista" style={{ opacity: isFetching ? 0.6 : 1, transition: 'opacity .2s' }}>
-                {agruparPorDia(data.items).map((g) => (
+                {agruparPorDia(items).map((g) => (
                   <div key={g.clave}>
                     <div className="dia-grupo">
                       <span>{g.etiqueta}</span>
                       {g.neto !== 0 && <span className={`num ${g.neto > 0 ? 'positivo' : ''}`} style={{ textTransform: 'none', letterSpacing: 0 }}>{g.neto > 0 ? '+' : '−'}{din(Math.abs(g.neto))}</span>}
                     </div>
                     {g.items.map((m) => (
-                      <MovimientoItem key={m.id} m={m} onClick={m.tipo.startsWith('prestamo') ? undefined : () => setEditando(m)} />
+                      <MovimientoItem key={m.id} m={m} onClick={m.tipo.startsWith('prestamo') || m.pendiente ? undefined : () => setEditando(m)} />
                     ))}
                   </div>
                 ))}

@@ -43,8 +43,10 @@ router.get('/', async (req, res) => {
     ),
     query(
       `SELECT COALESCE(c.id::text, 'sin') AS id, COALESCE(c.nombre, 'Sin categoría') AS nombre,
-              COALESCE(c.color, '#94a3b8') AS color, c.icono, sum(m.monto) AS total, count(*)::int AS n
+              COALESCE(c.color, '#94a3b8') AS color, c.icono, sum(m.monto) AS total, count(*)::int AS n,
+              max(pr.monto_mensual) AS presupuesto
        FROM movimientos m LEFT JOIN categorias c ON c.id = m.categoria_id
+       LEFT JOIN presupuestos pr ON pr.categoria_id = m.categoria_id AND pr.usuario_id = m.usuario_id
        WHERE m.usuario_id = $1 AND m.tipo = 'gasto'
          AND m.fecha_hora >= date_trunc('month', COALESCE($2::date, CURRENT_DATE))
          AND m.fecha_hora <  date_trunc('month', COALESCE($2::date, CURRENT_DATE)) + interval '1 month'

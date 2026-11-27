@@ -55,4 +55,26 @@ Cada alta/edición de movimiento o préstamo y cada abono hace `POST` a `N8N_WEB
 { "evento": "movimiento.creado", "movimiento": { "...": "fila de movimientos" }, "enviado_en": "ISO-8601" }
 ```
 
-Eventos: `movimiento.creado`, `movimiento.actualizado`, `prestamo.creado`, `prestamo.actualizado`, `prestamo.abono`. El resultado queda en `automatizaciones_log` y se ve en Configuración.
+Eventos: `movimiento.creado`, `movimiento.actualizado`, `prestamo.creado`, `prestamo.actualizado`, `prestamo.abono` y las alertas `alerta.gasto_grande`, `alerta.presupuesto_80`, `alerta.presupuesto_excedido`, `alerta.prestamo_por_vencer`, `alerta.prestamo_vencido`. Las alertas llegan así (ideal para reenviarlas por Telegram/WhatsApp/email desde n8n):
+
+```json
+{ "evento": "alerta.presupuesto_excedido", "alerta": { "id": "…", "tipo": "presupuesto_excedido", "titulo": "Presupuesto de Comida excedido", "mensaje": "Llevas 456.40 en Comida este mes (109% de 420.00).", "datos": { "categoria": "Comida", "porcentaje": 109 } }, "enviado_en": "ISO-8601" }
+```
+
+El resultado de cada envío queda en `automatizaciones_log` y se ve en Configuración.
+
+### n8n escribiendo de vuelta
+
+Genera un token en Configuración → Integraciones → «Generar token» y úsalo desde un nodo HTTP Request de n8n (la URL base es tu dominio):
+
+```bash
+curl -X PATCH https://TU_DOMINIO/api/n8n/movimientos/ID_MOVIMIENTO/categoria \
+  -H "X-Api-Key: fin_..." -H "Content-Type: application/json" \
+  -d '{"categoria_nombre": "Comida"}'
+```
+
+`GET /api/n8n/categorias` lista las categorías disponibles. n8n nunca toca la base de datos directamente.
+
+## Modo sin conexión
+
+Instalada como app (Android/escritorio), funciona sin internet: abre con tus datos guardados y puedes registrar gastos, ingresos, préstamos y abonos; quedan en el dispositivo y se sincronizan solos al volver la conexión (sin duplicar). Editar, borrar, escanear e importar necesitan conexión.

@@ -2,6 +2,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Campo, Segmentado } from './ui';
 import { useCategorias } from '../hooks/useCategorias';
 import { aInputFechaHora } from '../lib/formato';
+import { useQuery } from '@tanstack/react-query';
+import { Sparkles } from 'lucide-react';
+import { api, qs } from '../lib/api';
+
+/** Texto con retardo para no consultar en cada tecla. */
+function useRetardo(valor, ms = 450) {
+  const [v, setV] = useState(valor);
+  useEffect(() => { const t = setTimeout(() => setV(valor), ms); return () => clearTimeout(t); }, [valor, ms]);
+  return v;
+}
 
 const OPCIONES = [
   { valor: 'gasto', etiqueta: 'Gasto' },
@@ -39,6 +49,17 @@ export default function MovimientoForm({ inicial, onSubmit, guardando, textoBoto
   const cats = useMemo(() => categorias.filter((c) => c.tipo === tipoCat), [categorias, tipoCat]);
   const opciones = (tiposBloqueados || (permitirPrestamo ? OPCIONES.map((o) => o.valor) : ['gasto', 'ingreso']))
     .map((v) => OPCIONES.find((o) => o.valor === v));
+
+  // Sugerencia de categoría (historial + palabras clave) mientras el usuario escribe
+  const pista = useRetardo(`${f.descripcion.trim()}|${f.origen_destino.trim()}`);
+  const [desc, orig] = pista.split('|');
+  const { data: sug } = useQuery({
+    queryKey: ['sugerencia', f.tipo, desc, orig],
+    queryFn: () => api(`/categorias/sugerir${qs({ tipo: f.tipo, descripcion: desc, origen_destino: orig })}`),
+    enabled: !esPrestamo && !f.categoria_id && (desc.length > 2 || orig.length > 2) && navigator.onLine,
+    staleTime: 5 * 60_000,
+  });
+  const sugerencia = !f.categoria_id && !esPrestamo ? sug?.sugerencia : null;
 
   const set = (k) => (e) => setF((p) => ({ ...p, [k]: e?.target ? e.target.value : e }));
   const cambiarTipo = (tipo) => setF((p) => ({ ...p, tipo, categoria_id: tipo.startsWith('prestamo') === p.tipo.startsWith('prestamo') && tipo === p.tipo ? p.categoria_id : '' }));
@@ -82,6 +103,12 @@ export default function MovimientoForm({ inicial, onSubmit, guardando, textoBoto
               <option value="">Sin categoría</option>
               {cats.map((c) => <option key={c.id} value={c.id}>{c.icono ? `${c.icono} ` : ''}{c.nombre}</option>)}
             </select>
+            {sugerencia && (
+              <div className="sugerencia">
+                <Sparkles /> <span>Sugerida: <strong>{sugerencia.nombre}</strong></span>
+                <button type="button" onClick={() => setF((p) => ({ ...p, categoria_id: sugerencia.categoria_id }))}>Usar</button>
+              </div>
+            )}
           </Campo>
           <Campo label={esPrestamo ? 'Persona o lugar *' : f.tipo === 'ingreso' ? 'Origen' : 'Comercio / destino'} error={errores.origen_destino}>
             <input className="input" value={f.origen_destino} onChange={set('origen_destino')} placeholder={esPrestamo ? 'Ej. Juan, Banco…' : 'Opcional'} />

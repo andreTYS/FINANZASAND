@@ -6,7 +6,7 @@ import { useDashboard } from '../hooks/useDashboard';
 import { useMovimientos } from '../hooks/useMovimientos';
 import { usePrestamos } from '../hooks/usePrestamos';
 import { useSesion } from '../store/sesion';
-import { Card, Kpi, ErrorMsg, Vacio, Cabecera, Tendencia, TooltipGrafico, MesNav, Skeleton } from '../components/ui';
+import { Card, Kpi, SinDatosOffline, ErrorMsg, Vacio, Cabecera, Tendencia, TooltipGrafico, MesNav, Skeleton } from '../components/ui';
 import MovimientoItem from '../components/MovimientoItem';
 import { agruparPorDia } from '../lib/agrupar';
 import { mesActual, nombreMes, useDinero, fecha, ESTADOS_PRESTAMO } from '../lib/formato';
@@ -23,12 +23,13 @@ export default function Dashboard() {
   const din = useDinero();
   const nav = useNavigate();
 
-  if (error) return <ErrorMsg error={error} />;
+  if (error && !d) return <ErrorMsg error={error} />;
   const cabecera = (
     <Cabecera saludo={`${saludo()}, ${usuario?.nombre || ''} 👋`} titulo="Tu panel">
       <MesNav valor={mes} onChange={setMes} max={mesActual()} />
     </Cabecera>
   );
+  if (!d && !isLoading) return <>{cabecera}<SinDatosOffline /></>;
   if (isLoading) {
     return (
       <>
@@ -109,7 +110,16 @@ export default function Dashboard() {
                       <span style={{ fontWeight: 500 }}>{c.nombre}</span>
                       <span><strong className="num">{din(c.total)}</strong> <span className="suave num" style={{ fontSize: 12 }}>{((c.total / totalCat) * 100).toFixed(0)}%</span></span>
                     </div>
-                    <div className="barra-progreso"><div style={{ width: `${(c.total / maxCat) * 100}%`, background: c.color }} /></div>
+                    {c.presupuesto ? (
+                      <>
+                        <div className="barra-progreso"><div style={{ width: `${Math.min(100, (c.total / c.presupuesto) * 100)}%`, background: c.total > c.presupuesto ? 'var(--rojo-500)' : c.total >= c.presupuesto * 0.8 ? 'var(--amarillo-400)' : c.color }} /></div>
+                        <div className="suave" style={{ fontSize: 11, marginTop: 4 }}>
+                          {c.total > c.presupuesto ? `Excedido por ${din(c.total - c.presupuesto)}` : `Quedan ${din(c.presupuesto - c.total)} de ${din(c.presupuesto)}`}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="barra-progreso"><div style={{ width: `${(c.total / maxCat) * 100}%`, background: c.color }} /></div>
+                    )}
                   </div>
                 </div>
               ))}
