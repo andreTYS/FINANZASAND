@@ -1,0 +1,60 @@
+# Despliegue en el VPS (Hostinger) detrás de Traefik.
+# - postgres y backend solo en la red interna "interna".
+# - frontend (nginx) es el único enrutado por Traefik; hace proxy de /api al backend.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finanzas
+      POSTGRES_USER: finanzas
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD}
+      TZ: ${TZ:-America/Lima}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finanzas -d finanzas"]
+      interval: 10s
+      retries: 5
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://finanzas:${POSTGRES_PASSWORD}@postgres:5432/finanzas
+      JWT_SECRET: ${JWT_SECRET:?define JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?define JWT_REFRESH_SECRET}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      UPLOADS_DIR: /app/uploads
+      TZ: ${TZ:-America/Lima}
+    volumes:
+      - uploads:/app/uploads
+    networks: [interna]
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on: [backend]
+    networks: [interna, traefik]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=${TRAEFIK_NETWORK:-traefik}
+      - traefik.http.routers.finanzas.rule=Host(`${DOMINIO:?define DOMINIO}`)
+      - traefik.http.routers.finanzas.entrypoints=${TRAEFIK_ENTRYPOINT:-websecure}
+      - traefik.http.routers.finanzas.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencrypt}
+      - traefik.http.services.finanzas.loadbalancer.server.port=80
+
+volumes:
+  pgdata:
+  uploads:
+
+networks:
+  interna:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
